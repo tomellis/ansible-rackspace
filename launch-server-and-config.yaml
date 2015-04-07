@@ -1,0 +1,55 @@
+- name: Build a Cloud Server
+  hosts: localhost # target local host
+  connection: local # run actions locally
+  gather_facts: False
+  tasks:
+    - name: Server build request
+      local_action:
+        module: rax
+        credentials: ~/creds # rackspace cloud credentials
+        name: test-server
+        group: myapp
+        flavor: general1-1 # 1GB server
+        image: 892b9bab-a11e-4d16-b4bd-ab9494ed7b78 # Image ID for Debian Sid
+        region: LON # London Region
+        key_name: ansible-bastion # keypair to use
+        wait: yes # wait for server to build
+        count: 5
+        wait_timeout: 50000
+        state: present
+        networks:
+          - private
+          - public
+      register: rax
+
+    - name: Add the instance to an ansible group called myapp
+      local_action:
+        module: add_host
+        hostname: "{{ item.name }}"
+        ansible_ssh_host: "{{ item.rax_accessipv4 }}"
+        ansible_ssh_pass: "{{ item.rax_adminpass }}"
+        ansible_ssh_user: root
+        groupname: myapp
+      with_items: rax.success
+      when: rax.action == 'create'
+
+- name: Wait for port 22 to be ready
+  hosts: myapp
+  gather_facts: False
+  tasks:
+    - local_action: wait_for port=22 host="{{ ansible_ssh_host }}" search_regex=OpenSSH delay=10
+
+- name: Install Packages
+  hosts: myapp
+  user: root
+  gather_facts: False
+  tasks:
+  - name: Update apt cache
+    apt: update_cache=yes
+
+  - name: Install Packages
+    action: apt state=installed pkg={{ item }}
+    with_items:
+    - vim
+    - git
+    - tmux

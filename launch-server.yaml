@@ -1,0 +1,20 @@
+- name: Build a Cloud Server
+  hosts: localhost # target local host
+  connection: local # run actions locally
+  gather_facts: False
+  tasks:
+    - name: Server build request
+      local_action:
+        module: rax
+        credentials: ~/creds # rackspace cloud credentials
+        name: test-server
+        flavor: general1-1 # 1GB server
+        image: 892b9bab-a11e-4d16-b4bd-ab9494ed7b78 # Image ID for Debian Sid
+        region: LON # London Region
+        key_name: ansible-bastion # keypair to use
+        wait: no # wait for server to build
+        state: present
+        networks:
+          - private
+          - public
+      register: rax
