@@ -1,20 +1,20 @@
-- name: Build a Cloud Server
-  hosts: localhost # target local host
-  connection: local # run actions locally
-  gather_facts: False
-  tasks:
-    - name: Server build request
-      local_action:
-        module: rax
-        credentials: ~/creds # rackspace cloud credentials
-        name: test-server
-        flavor: general1-1 # 1GB server
-        image: 892b9bab-a11e-4d16-b4bd-ab9494ed7b78 # Image ID for Debian Sid
+- name: Build a Cloud Server # The name of this play
+  hosts: localhost # Target local host
+  connection: local # No remote connections, run actions locally
+  gather_facts: False # This gathers useful facts from remote hosts, not required on localhost
+  tasks: # All of the separate tasks we are going to carry out, in this case just one
+    - name: Server build request # The name of the task
+      local_action: # Always run this on the local machine not a remote machine
+        module: rax # Rackspace Cloud module which is part of ansible core
+        credentials: ~/creds # Rackspace cloud credentials file we created above
+        name: test-server # Name of the cloud server 
+        flavor: general1-1 # 1GB server - see http://goo.gl/zcPH15 for a list of flavors
+        image: 892b9bab-a11e-4d16-b4bd-ab9494ed7b78 # Image ID for Debian Sid, pulled from 'nova image-list'
         region: LON # London Region
-        key_name: ansible-bastion # keypair to use
-        wait: no # wait for server to build
-        state: present
-        networks:
-          - private
-          - public
-      register: rax
+        key_name: ansible-bastion # SSH Keypair, use 'nova keypair-add' to upload one to RS Cloud
+        wait: no # Do not wait for server to build, return immediately
+        state: present # Create the server
+        networks: # These are the two different default networks on Rackspace cloud
+          - private # Rackspace service net
+          - public # Rackspace public net
+      register: rax # Save the result of the command in the rax variable for use in a later tasks
