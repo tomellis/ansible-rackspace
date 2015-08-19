@@ -14,7 +14,7 @@
         region: LON # London Region
         key_name: ansible-bastion # keypair to use
         wait: yes # wait for server to build
-        count: 5
+        count: 2
         wait_timeout: 50000
         state: present
         networks:
@@ -41,15 +41,64 @@
 
 - name: Install Packages
   hosts: myapp
-  user: root
+  user: "{{ ansible_ssh_user }}"
   gather_facts: False
   tasks:
   - name: Update apt cache
     apt: update_cache=yes
 
-  - name: Install Packages
+  - name: Install Useful Packages
     action: apt state=installed pkg={{ item }}
     with_items:
     - vim
     - git
     - tmux
+
+- name: Install and Configure Nginx
+  hosts: myapp
+  user: "{{ ansible_ssh_user }}"
+  gather_facts: True
+  tasks:
+
+  - name: Install Nginx Package
+    action: apt state=installed pkg={{ item }}
+    with_items:
+    - nginx
+
+  - name: Add a simple index file
+    action: lineinfile dest=/var/www/html/index.html create=yes state=present line="This is {{ ansible_hostname }}"
+
+- name: Build a Cloud Load Balancer and add servers to it
+  hosts: localhost
+  connection: local
+  gather_facts: False
+  tasks:
+    - name: Load Balancer create request
+      local_action:
+        module: rax_clb
+        credentials: ~/creds
+        name: my-web-site
+        port: 80
+        protocol: HTTP
+        algorithm: ROUND_ROBIN
+        type: PUBLIC
+        timeout: 30
+        region: LON
+        wait: yes
+        state: present
+        meta:
+          app: my-cool-app
+      register: clb
+
+    - name: Add servers to Load Balancer
+      with_items: groups['myapp']
+      local_action:
+        module: rax_clb_nodes
+        credentials: ~/creds
+        load_balancer_id: "{{ clb.balancer.id }}"
+        address: "{{ hostvars[item]['ansible_ssh_host'] }}"
+        port: 80
+        condition: enabled
+        type: primary
+        wait: yes
+        region: LON
